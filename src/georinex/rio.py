@@ -10,8 +10,17 @@ import logging
 
 import xarray
 
-from hatanaka import crx2rnx
-from ncompress import decompress as unlzw
+try:
+    from hatanaka import crx2rnx
+except ImportError:
+    logging.info("hatanaka crx2rnx not available")
+    crx2rnx = None
+
+try:
+    from ncompress import decompress as unlzw
+except ImportError:
+    logging.info("ncompress unlzw not available")
+    unlzw = None
 
 
 @contextmanager
@@ -31,7 +40,7 @@ def opener(fn: T.TextIO | Path, header: bool = False) -> T.Iterator[T.TextIO]:
 
         finf = fn.stat()
         if finf.st_size > 100e6:
-            logging.info(f"opening {finf.st_size/1e6} MByte {fn.name}")
+            logging.info(f"opening {finf.st_size / 1e6} MByte {fn.name}")
 
         # %% get magic number
         """https://en.wikipedia.org/wiki/List_of_file_signatures"""
@@ -77,6 +86,9 @@ def opener(fn: T.TextIO | Path, header: bool = False) -> T.Iterator[T.TextIO]:
                         )
                         yield f
         elif suffix == ".z" or magic.startswith(b"\x1f\x9d"):
+            if unlzw is None:
+                raise ImportError("ncompress unlzw not available")
+
             with fn.open("rb") as zu:
                 with io.StringIO(unlzw(zu.read()).decode("ascii")) as f:
                     _, is_crinex = rinex_version(first_nonblank_line(f))
